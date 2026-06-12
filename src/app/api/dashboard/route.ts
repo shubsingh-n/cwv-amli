@@ -9,8 +9,13 @@ export async function GET() {
 
     const companies = await Company.find({}).lean();
     
-    // Get all records (or could filter by last 30 days)
-    const records = await CWVRecord.find({}).sort({ date: 1 }).lean();
+    // Calculate cutoff date: 28 days ago
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 28);
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+    // Get records for the last 28 days
+    const records = await CWVRecord.find({ date: { $gte: cutoffStr } }).sort({ date: 1 }).lean();
 
     return NextResponse.json({
       success: true,

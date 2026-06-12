@@ -13,7 +13,12 @@ const CompanySchema = new mongoose.Schema({
 const Company = mongoose.models.Company || mongoose.model('Company', CompanySchema, 'companies');
 
 async function fix() {
-  await mongoose.connect(MONGODB_URI);
+  try {
+    await mongoose.connect(MONGODB_URI);
+  } catch (err) {
+    console.error('Failed to connect to MongoDB:', err.message);
+    process.exit(1);
+  }
   const companies = await Company.find();
   for (const c of companies) {
     const oldName = c.name;

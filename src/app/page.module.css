@@ -498,7 +498,360 @@
 
 .emptyState {
   text-align: center;
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+.metricHeader {
+  padding: 0.45rem 0.4rem;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  border-bottom: 2px solid var(--border);
+  border-left: 1px solid rgba(255,255,255,0.04);
+  min-width: 70px;
+}
+
+/* Body rows */
+.table tbody tr {
+  transition: background 0.15s;
+}
+.table tbody tr:hover td { background-color: rgba(255,255,255,0.03); }
+.table tbody tr:nth-child(even) td { background-color: rgba(255,255,255,0.01); }
+
+.rowFetching { opacity: 0.7; }
+
+.seqCell {
+  padding: 0.7rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-right: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  background: #0f172a;
+  z-index: 1;
+}
+.table tbody tr:hover .seqCell { background: #111c2d; }
+
+.urlCell {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-right: 2px solid var(--border);
+  min-width: 280px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  position: sticky;
+  left: 42px;
+  background: #0f172a;
+  z-index: 1;
+}
+.table tbody tr:hover .urlCell { background: #111c2d; color: var(--text-main); }
+
+.fetchingDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  margin-right: 0.4rem;
+  animation: pulse 1s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  background: #1e293b;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.contextMenuItem {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 1rem;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  transition: background 0.15s;
+}
+.contextMenuItem:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.metricCell {
+  padding: 0.55rem 0.4rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-left: 1px solid rgba(255,255,255,0.04);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
+  transition: background 0.1s;
+}
+
+.emptyCell {
+  padding: 0.55rem 0.4rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-left: 1px solid rgba(255,255,255,0.04);
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.statusCell {
+  white-space: nowrap;
+}
+
+/* ── Metric Colours (cell background + text) ── */
+.metricGood {
+  color: #34d399;
+  background-color: rgba(16, 185, 129, 0.08);
+}
+.metricNeedsImprovement {
+  color: #fbbf24;
+  background-color: rgba(245, 158, 11, 0.08);
+}
+.metricPoor {
+  color: #f87171;
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+/* ── Status Badges ── */
+.badge {
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-block;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.statusPass {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.statusFail {
+  background-color: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.statusUnknown {
+  background-color: rgba(148, 163, 184, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.originLabel {
+  font-size: 0.65rem;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  margin-left: 0.35rem;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+/* ── Loading / Empty ── */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 250px;
+  font-size: 1rem;
+  color: var(--text-muted);
+  gap: 1rem;
+}
+
+.loader {
+  border: 3px solid var(--surface-hover);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  animation: spin 0.8s linear infinite;
+}
+
+.emptyState {
+  text-align: center;
   padding: 5rem 2rem;
   color: var(--text-muted);
 }
 .emptyState h2 { margin-bottom: 0.5rem; font-size: 1.4rem; }
+
+/* ── Desktop UI Constraints ── */
+.mobileMenuToggle { display: none; }
+.mobileBackdrop { display: none; }
+.mobileToolbarControls { display: none; }
+.mobileSheetHeader { display: none; }
+.mobileApplyBtn { display: none; }
+
+/* ── Mobile Responsiveness ── */
+@media (max-width: 768px) {
+  .container { padding: 1rem; }
+  
+  /* Header & Hamburger */
+  .header {
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 50;
+  }
+  .mobileMenuToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text-main);
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+  }
+  .actions {
+    position: fixed;
+    top: 70px; /* Below header */
+    right: 1rem;
+    width: 250px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    z-index: 50;
+  }
+  .actionsOpen {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .actions .btn {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .fetchStatus {
+    text-align: center;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Backdrop */
+  .mobileBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    backdrop-filter: blur(4px);
+  }
+
+  /* Toolbar Bottom Sheet */
+  .mobileToolbarControls {
+    display: flex;
+    padding-bottom: 1rem;
+  }
+  .toolbar {
+    position: fixed;
+    top: 70px; /* Below header */
+    left: 0;
+    width: 100%;
+    background: #0f172a;
+    border-bottom: 1px solid var(--glass-border);
+    border-radius: 0 0 16px 16px;
+    padding: 1.5rem;
+    flex-direction: column;
+    align-items: stretch;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    transform: translateY(-20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    z-index: 50;
+    margin-bottom: 0;
+  }
+  .toolbarOpen {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .mobileSheetHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    width: 100%;
+  }
+  .mobileSheetHeader h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-main);
+  }
+  .closeSheetBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+  .toolbarDivider { display: none; }
+  .toolbarLabel { margin-top: 0.5rem; }
+  .filterBtn { width: 100%; justify-content: center; }
+  .mobileApplyBtn { display: block; margin-top: 1.5rem; width: 100%; }
+  .toolbarHintDesktopOnly { display: none; }
+  .toolbarHint { text-align: center; margin-top: 1rem; }
+
+  /* Scroll only the table on mobile — keep toolbar fixed */
+  .contentArea {
+    overflow-x: hidden;
+  }
+
+  .tableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* Disable all sticky positioning on mobile (fixed top offsets overlap rows) */
+  .table thead tr th {
+    position: static;
+    top: auto;
+    left: auto;
+  }
+
+  .urlHeader,
+  .seqHeader,
+  .urlCell,
+  .seqCell {
+    position: static;
+    left: auto;
+  }
+
+  .urlHeader,
+  .urlCell {
+    min-width: 160px;
+    max-width: 200px;
+  }
+}

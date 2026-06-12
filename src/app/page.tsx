@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 
 interface Company {
@@ -91,18 +92,66 @@ function computeGoodUrlStats(
 }
 
 export default function Dashboard() {
-  const [companies, setCompanies] = useState<Company[]>([]);
+
   const [records, setRecords] = useState<CWVRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('');
   const [fetchStatus, setFetchStatus] = useState<string>('');
+  const [deviceFilter, setDeviceFilter] = useState<'all' | 'mobile' | 'desktop'>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; url: string } | null>(null);
   const [fetchingUrls, setFetchingUrls] = useState<Set<string>>(new Set());
+  const router = useRouter();
+
+    const [companies, setCompanies] = useState<Company[]>([]);
+
+  // Ref for the context menu DOM element
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Derived data structures
+  const activeCompany = useMemo(() => companies.find(c => c.name === activeTab), [companies, activeTab]);
+
+  const dataMap = useMemo(() => {
+    const map: Record<string, Record<string, Record<string, CWVRecord>>> = {};
+    records.forEach(r => {
+      if (!map[r.url]) map[r.url] = {};
+      if (!map[r.url][r.date]) map[r.url][r.date] = {};
+      map[r.url][r.date][r.device] = r;
+    });
+    return map;
+  }, [records]);
+
+  const uniqueDates = useMemo(() => {
+    const dates = new Set(records.map(r => r.date));
+    return Array.from(dates).sort().reverse();
+  }, [records]);
+
+  const latestDate = uniqueDates[0] ?? '';
+
+  // Compute missing URLs for the latest date
+  const computeMissingUrls = useCallback(() => {
+    if (!latestDate) return [];
+    return activeCompany?.urls.filter(url => {
+      const mobile = dataMap[url]?.[latestDate]?.mobile;
+      const desktop = dataMap[url]?.[latestDate]?.desktop;
+      return !(mobile && desktop);
+    }) ?? [];
+  }, [activeCompany, latestDate, dataMap]);
+
+  const missingUrls = useMemo(() => computeMissingUrls(), [computeMissingUrls]);
+
+  const handleFetchMissing = async () => {
+    if (!missingUrls.length) {
+      setFetchStatus('No missing URLs');
+      return;
+    }
+    await triggerFetch(missingUrls, false);
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -181,6 +230,10 @@ export default function Dashboard() {
 
   const handleFetchCWV = () => triggerFetch(undefined, false);
 
+  // Fetch new data for the current date (force re-fetch)
+  const handleFetchNewData = () => triggerFetch(undefined, true);
+
+
   const handleUrlContextMenu = (e: React.MouseEvent, url: string) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, url });
@@ -194,25 +247,6 @@ export default function Dashboard() {
       setSortDir('asc');
     }
   };
-
-  const activeCompany = companies.find(c => c.name === activeTab);
-
-  const uniqueDates = useMemo(() => {
-    const dates = new Set(records.map(r => r.date));
-    return Array.from(dates).sort().reverse();
-  }, [records]);
-
-  const latestDate = uniqueDates[0] ?? '';
-
-  const dataMap = useMemo(() => {
-    const map: Record<string, Record<string, Record<string, CWVRecord>>> = {};
-    records.forEach(r => {
-      if (!map[r.url]) map[r.url] = {};
-      if (!map[r.url][r.date]) map[r.url][r.date] = {};
-      map[r.url][r.date][r.device] = r;
-    });
-    return map;
-  }, [records]);
 
   const getSortValue = useCallback((url: string, key: SortKey): number | string => {
     if (key === 'url') return url;
@@ -230,44 +264,52 @@ export default function Dashboard() {
 
   const displayUrls = useMemo(() => {
     if (!activeCompany) return [];
-
+    // Start with all URLs of the active company
     let urls = [...activeCompany.urls];
 
     if (latestDate) {
+      // Status filter
       if (statusFilter !== 'all') {
         urls = urls.filter(url => {
-          const status = dataMap[url]?.[latestDate]?.mobile?.status;
-          if (statusFilter === 'pass') return status === 'Pass';
-          return status !== 'Pass';
+          const mobileStatus = dataMap[url]?.[latestDate]?.mobile?.status;
+          const desktopStatus = dataMap[url]?.[latestDate]?.desktop?.status;
+          
+          const mobileMatch = mobileStatus && (statusFilter === 'pass' ? mobileStatus === 'Pass' : mobileStatus !== 'Pass');
+          const desktopMatch = desktopStatus && (statusFilter === 'pass' ? desktopStatus === 'Pass' : desktopStatus !== 'Pass');
+          
+          if (deviceFilter === 'mobile') return mobileMatch;
+          if (deviceFilter === 'desktop') return desktopMatch;
+          return mobileMatch || desktopMatch;
         });
       }
-
+      // Source filter
       if (sourceFilter !== 'all') {
         urls = urls.filter(url => {
-          const r = dataMap[url]?.[latestDate]?.mobile;
-          if (!r) return false;
-          if (sourceFilter === 'origin') return r.isOriginFallback;
-          return !r.isOriginFallback;
+          const mobileR = dataMap[url]?.[latestDate]?.mobile;
+          const desktopR = dataMap[url]?.[latestDate]?.desktop;
+          
+          const mobileMatch = mobileR && (sourceFilter === 'origin' ? mobileR.isOriginFallback : !mobileR.isOriginFallback);
+          const desktopMatch = desktopR && (sourceFilter === 'origin' ? desktopR.isOriginFallback : !desktopR.isOriginFallback);
+          
+          if (deviceFilter === 'mobile') return mobileMatch;
+          if (deviceFilter === 'desktop') return desktopMatch;
+          return mobileMatch || desktopMatch;
         });
       }
     }
 
+    // Sorting
     if (sortKey) {
       urls.sort((a, b) => {
         const av = getSortValue(a, sortKey);
         const bv = getSortValue(b, sortKey);
-        let cmp = 0;
-        if (typeof av === 'string' && typeof bv === 'string') {
-          cmp = av.localeCompare(bv);
-        } else {
-          cmp = (av as number) - (bv as number);
-        }
+        const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number);
         return sortDir === 'asc' ? cmp : -cmp;
       });
     }
 
     return urls;
-  }, [activeCompany, statusFilter, sourceFilter, latestDate, dataMap, sortKey, sortDir, getSortValue]);
+  }, [activeCompany, statusFilter, sourceFilter, deviceFilter, latestDate, dataMap, sortKey, sortDir, getSortValue]);
 
   const fmt = (val: number | null, key: MetricKey): string => {
     if (val === null) return '—';
@@ -286,17 +328,84 @@ export default function Dashboard() {
   const COLS_PER_DATE = DEVICES.length * COLS_PER_DEVICE;
   const METRIC_LABELS = ['FCP', 'LCP', 'CLS', 'INP', 'Status'] as const;
 
+  const exportCSV = () => {
+    const rows: string[] = [];
+    const header = ['URL'];
+    uniqueDates.forEach(date => {
+      DEVICES.forEach(device => {
+        const dStr = device === 'mobile' ? 'Mobile' : 'Desktop';
+        METRIC_LABELS.forEach(label => {
+          header.push(`${date} ${dStr} ${label}`);
+        });
+      });
+    });
+    rows.push(header.join(','));
+
+    displayUrls.forEach(url => {
+      const row = [`"${url}"`];
+      uniqueDates.forEach(date => {
+        DEVICES.forEach(device => {
+          const r = dataMap[url]?.[date]?.[device];
+          if (!r) {
+            METRIC_LABELS.forEach(() => row.push('"—"'));
+          } else {
+            METRIC_LABELS.forEach(label => {
+              if (label === 'Status') {
+                const statusStr = r.status + (r.isOriginFallback ? ' (Origin)' : '');
+                row.push(`"${statusStr}"`);
+              } else {
+                const key = label.toLowerCase() as MetricKey;
+                row.push(`"${fmt(r[key], key)}"`);
+              }
+            });
+          }
+        });
+      });
+      rows.push(row.join(','));
+    });
+
+    const csvStr = rows.join('\n');
+    const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.setAttribute('download', 'cwv_root_tracker.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <h1 className={styles.title}>CWV Tracker</h1>
-        <div className={styles.actions}>
+        
+        <button className={styles.mobileMenuToggle} onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Toggle menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+
+        {isMobileMenuOpen && <div className={styles.mobileBackdrop} onClick={() => setIsMobileMenuOpen(false)} />}
+        
+        <div className={`${styles.actions} ${isMobileMenuOpen ? styles.actionsOpen : ''}`}>
           {fetchStatus && <span className={styles.fetchStatus}>{fetchStatus}</span>}
-          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleFetchCWV} title="Fetches only URLs missing data for today">
-            Fetch Today&apos;s CWV
+
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { exportCSV(); setIsMobileMenuOpen(false); }} title="Export current view to CSV">
+            Export CSV
           </button>
-          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={fetchData}>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { handleFetchMissing(); setIsMobileMenuOpen(false); }} title="Fetch only URLs missing CWV data for today">
+            Fetch Missing
+          </button>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { fetchData(); setIsMobileMenuOpen(false); }}>
             Refresh
+          </button>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { handleFetchNewData(); setIsMobileMenuOpen(false); }} title="Fetch new data for today (force)">
+            Fetch New Data
+          </button>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => router.push('/dashboard')}>
+            Go to Dashboard
+          </button>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => router.push('/query')}>
+            Query Data
           </button>
         </div>
       </header>
@@ -327,8 +436,35 @@ export default function Dashboard() {
           <div className={styles.contentArea}>
             {activeCompany && (
               <>
-                <div className={styles.toolbar}>
-                  <span className={styles.toolbarLabel}>Status (mobile):</span>
+                <div className={styles.toolbarContainer}>
+                  <div className={styles.mobileToolbarControls}>
+                    <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setIsMobileFiltersOpen(true)}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '6px'}}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                      Filters
+                    </button>
+                  </div>
+
+                  {isMobileFiltersOpen && <div className={styles.mobileBackdrop} onClick={() => setIsMobileFiltersOpen(false)} />}
+                  
+                  <div className={`${styles.toolbar} ${isMobileFiltersOpen ? styles.toolbarOpen : ''}`}>
+                    <div className={styles.mobileSheetHeader}>
+                      <h3>Filters</h3>
+                      <button className={styles.closeSheetBtn} onClick={() => setIsMobileFiltersOpen(false)}>×</button>
+                    </div>
+
+                    <span className={styles.toolbarLabel}>Device:</span>
+                    {(['all', 'mobile', 'desktop'] as const).map(d => (
+                    <button
+                      key={d}
+                      className={`${styles.filterBtn} ${deviceFilter === d ? styles.filterBtnActive : ''}`}
+                      onClick={() => {setDeviceFilter(d); setIsMobileFiltersOpen(false);}}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                  <span className={styles.toolbarDivider}>|</span>
+                  <span className={styles.toolbarLabel}>Status:</span>
                   {(['all', 'pass', 'fail'] as StatusFilter[]).map(f => (
                     <button
                       key={f}
@@ -341,7 +477,7 @@ export default function Dashboard() {
                     </button>
                   ))}
                   <span className={styles.toolbarDivider}>|</span>
-                  <span className={styles.toolbarLabel}>Source (mobile):</span>
+                  <span className={styles.toolbarLabel}>Source:</span>
                   {(['all', 'origin', 'traffic'] as SourceFilter[]).map(f => (
                     <button
                       key={f}
@@ -357,10 +493,17 @@ export default function Dashboard() {
                     {displayUrls.length} / {activeCompany.urls.length} URLs
                     {latestDate ? ` · latest: ${latestDate}` : ''}
                   </span>
-                  <span className={styles.toolbarHint}>
+                  <span className={styles.toolbarHintDesktopOnly}>
                     Right-click a URL to fetch it individually
                   </span>
+                  
+                  {isMobileFiltersOpen && (
+                    <button className={`${styles.btn} ${styles.btnPrimary} ${styles.mobileApplyBtn}`} onClick={() => setIsMobileFiltersOpen(false)}>
+                      Apply Filters
+                    </button>
+                  )}
                 </div>
+              </div>
 
                 <div className={styles.tableWrapper}>
                   <table className={styles.table}>
