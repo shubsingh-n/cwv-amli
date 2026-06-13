@@ -239,6 +239,16 @@ export default function Dashboard() {
     setContextMenu({ x: e.clientX, y: e.clientY, url });
   };
 
+  const displayShortUrl = (u: string) => {
+    try {
+      const parsed = new URL(u);
+      // remove protocol and host, keep pathname + search + hash
+      return `${parsed.pathname}${parsed.search}${parsed.hash}` || u;
+    } catch {
+      return u;
+    }
+  };
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -493,9 +503,6 @@ export default function Dashboard() {
                     {displayUrls.length} / {activeCompany.urls.length} URLs
                     {latestDate ? ` · latest: ${latestDate}` : ''}
                   </span>
-                  <span className={styles.toolbarHintDesktopOnly}>
-                    Right-click a URL to fetch it individually
-                  </span>
                   
                   {isMobileFiltersOpen && (
                     <button className={`${styles.btn} ${styles.btnPrimary} ${styles.mobileApplyBtn}`} onClick={() => setIsMobileFiltersOpen(false)}>
@@ -586,7 +593,7 @@ export default function Dashboard() {
                           <td className={styles.seqCell}>{i + 1}</td>
                           <td className={styles.urlCell} title={`${url}\nRight-click to fetch`}>
                             {fetchingUrls.has(url) && <span className={styles.fetchingDot} />}
-                            {url}
+                            {displayShortUrl(url)}
                             {dataMap[url] && Object.values(dataMap[url]).some(d =>
                               d.mobile?.isOriginFallback || d.desktop?.isOriginFallback
                             ) && (
@@ -641,6 +648,16 @@ export default function Dashboard() {
           className={styles.contextMenu}
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
+          <button
+            className={styles.contextMenuItem}
+            onClick={() => {
+              // Open the actual URL in a new tab/window
+              window.open(contextMenu.url, '_blank', 'noopener');
+              setContextMenu(null);
+            }}
+          >
+            Open URL
+          </button>
           <button
             className={styles.contextMenuItem}
             onClick={() => {
