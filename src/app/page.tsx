@@ -297,13 +297,20 @@ export default function Dashboard() {
         urls = urls.filter(url => {
           const mobileR = dataMap[url]?.[latestDate]?.mobile;
           const desktopR = dataMap[url]?.[latestDate]?.desktop;
-          
-          const mobileMatch = mobileR && (sourceFilter === 'origin' ? mobileR.isOriginFallback : !mobileR.isOriginFallback);
-          const desktopMatch = desktopR && (sourceFilter === 'origin' ? desktopR.isOriginFallback : !desktopR.isOriginFallback);
-          
-          if (deviceFilter === 'mobile') return mobileMatch;
-          if (deviceFilter === 'desktop') return desktopMatch;
-          return mobileMatch || desktopMatch;
+
+          const wantOrigin = sourceFilter === 'origin';
+          // If filtering by a specific device, require that device to exist and match the source
+          if (deviceFilter === 'mobile') {
+            return !!mobileR && (wantOrigin ? mobileR.isOriginFallback : !mobileR.isOriginFallback);
+          }
+          if (deviceFilter === 'desktop') {
+            return !!desktopR && (wantOrigin ? desktopR.isOriginFallback : !desktopR.isOriginFallback);
+          }
+
+          // deviceFilter === 'all' — require that every available device for this URL matches the source.
+          const mobileOk = mobileR ? (wantOrigin ? mobileR.isOriginFallback : !mobileR.isOriginFallback) : true;
+          const desktopOk = desktopR ? (wantOrigin ? desktopR.isOriginFallback : !desktopR.isOriginFallback) : true;
+          return mobileOk && desktopOk;
         });
       }
     }
