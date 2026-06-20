@@ -99,8 +99,32 @@ export default function Dashboard() {
 
   const uniqueDates = useMemo(() => {
     const dates = new Set(records.map(r => r.date));
-    return Array.from(dates).sort(); // oldest → newest (left to right)
+    // newest → oldest (left to right)
+    return Array.from(dates).sort().reverse();
   }, [records]);
+
+    // Compute recently failed URLs (passed on any previous day, failing today) for Axis Max Life only
+  const recentFailedUrls = useMemo(() => {
+    if (uniqueDates.length < 1) return [];
+    const latest = uniqueDates[0];
+    // Get URLs belonging to Axis Max Life company
+    const axisCompany = companies.find(c => c.name.toLowerCase().includes('axis max life'));
+    const axisUrls = axisCompany ? axisCompany.urls : [];
+
+    return Object.keys(dataMap).filter(url => {
+      if (!axisUrls.includes(url)) return false;
+      const latestDevices = dataMap[url]?.[latest] ?? {};
+      const latestPass = Object.values(latestDevices).some(r => r?.status === 'Pass');
+      if (latestPass) return false;
+      const earlierDates = uniqueDates.slice(1);
+      const hasPrevPass = earlierDates.some(date => {
+        const dev = dataMap[url]?.[date] ?? {};
+        return Object.values(dev).some(r => r?.status === 'Pass');
+      });
+      return hasPrevPass;
+    });
+  }, [uniqueDates, dataMap, companies]);
+  // Duplicate recentFailedUrls definition removed
 
   const DEVICES: Device[] = ['mobile', 'desktop'];
 
@@ -164,79 +188,84 @@ export default function Dashboard() {
           </button>
         </div>
       </header>
+      <>
+        {recentFailedUrls.length > 0 && (
+          <div className={styles.recentFailedSection}>
+            <h2 className={styles.sectionTitle}>Recently Failed URLs</h2>
+            <ul className={styles.failedList}>
+              {recentFailedUrls.map(url => (
+                <li key={url} className={styles.failedItem}>{url}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-      {loading ? (
-        <div className={styles.loadingContainer}>
-          <div className={styles.loader}></div>
-          <span>Loading Dashboard…</span>
-        </div>
-      ) : companies.length === 0 ? (
-        <div className={styles.emptyState}>
-          <h2>No Data Found</h2>
-          <p>Ensure MongoDB is connected and URLs are seeded.</p>
-        </div>
-      ) : (
-        <div className={styles.tableCard}>
-          <div className={styles.tableWrapper}>
-            <table className={styles.table}>
-              <thead>
-                {/* Row 1: Date headers — each date spans 4 columns (Mobile Origin+Traffic, Desktop Origin+Traffic) */}
-                <tr>
-                  <th rowSpan={3} className={styles.urlHeader}>URL</th>
-                  {uniqueDates.map(date => (
-                    <th key={date} colSpan={4} className={styles.dateHeader}>
-                      {date}
-                    </th>
-                  ))}
-                </tr>
-                {/* Row 2: Mobile / Desktop under each date */}
-                <tr>
-                  {uniqueDates.map(date =>
-                    DEVICES.map(device => (
-                      <th key={`${date}-${device}`} colSpan={2} className={styles.deviceHeader}>
-                        {device === 'mobile' ? 'Mobile' : 'Desktop'}
+        {loading ? (
+          <div className={styles.loadingContainer}>
+            <div className={styles.loader} />
+            <span>Loading Dashboard…</span>
+          </div>
+        ) : companies.length === 0 ? (
+          <div className={styles.emptyState}>
+            <h2>No Data Found</h2>
+            <p>Ensure MongoDB is connected and URLs are seeded.</p>
+          </div>
+        ) : (
+          <div className={styles.tableCard}>
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th rowSpan={3} className={styles.urlHeader}>URL</th>
+                    {uniqueDates.map(date => (
+                      <th key={date} colSpan={4} className={styles.dateHeader}>
+                        {date}
                       </th>
-                    ))
-                  )}
-                </tr>
-                {/* Row 3: Origin / Traffic under each device */}
-                <tr>
-                  {uniqueDates.map(date =>
-                    DEVICES.map(device => (
-                      <React.Fragment key={`${date}-${device}`}>
-                        <th className={styles.subHeader}>Origin</th>
-                        <th className={styles.subHeader}>Traffic</th>
-                      </React.Fragment>
-                    ))
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {companies.map(company => (
-                  <tr key={company._id}>
-                    <td className={styles.companyCell}>{company.name}</td>
+                    ))}
+                  </tr>
+                  <tr>
                     {uniqueDates.map(date =>
-                      DEVICES.map(device => {
-                        const stats = computeGoodUrlStats(company.urls, date, device, dataMap);
-                        return (
-                          <React.Fragment key={`${date}-${device}`}>
-                            <td className={styles.statCell}>
-                              {formatStat(stats.originPass, stats.totalUrls)}
-                            </td>
-                            <td className={styles.statCell}>
-                              {formatStat(stats.directPass, stats.directTotal)}
-                            </td>
-                          </React.Fragment>
-                        );
-                      })
+                      DEVICES.map(device => (
+                        <th key={`${date}-${device}`} colSpan={2} className={styles.deviceHeader}>
+                          {device === 'mobile' ? 'Mobile' : 'Desktop'}
+                        </th>
+                      ))
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  <tr>
+                    {uniqueDates.map(date =>
+                      DEVICES.map(device => (
+                        <React.Fragment key={`${date}-${device}`}>
+                          <th className={styles.subHeader}>Origin</th>
+                          <th className={styles.subHeader}>Traffic</th>
+                        </React.Fragment>
+                      ))
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {companies.map(company => (
+                    <tr key={company._id}>
+                      <td className={styles.companyCell}>{company.name}</td>
+                      {uniqueDates.map(date =>
+                        DEVICES.map(device => {
+                          const stats = computeGoodUrlStats(company.urls, date, device, dataMap);
+                          return (
+                            <React.Fragment key={`${date}-${device}`}>
+                              <td className={styles.statCell}>{formatStat(stats.originPass, stats.totalUrls)}</td>
+                              <td className={styles.statCell}>{formatStat(stats.directPass, stats.directTotal)}</td>
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </>
     </div>
   );
 }
