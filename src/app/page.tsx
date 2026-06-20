@@ -278,18 +278,20 @@ export default function Dashboard() {
     let urls = [...activeCompany.urls];
 
     if (latestDate) {
-      // Status filter
+      // Status filter — check across ALL dates (28-day rolling window)
       if (statusFilter !== 'all') {
         urls = urls.filter(url => {
-          const mobileStatus = dataMap[url]?.[latestDate]?.mobile?.status;
-          const desktopStatus = dataMap[url]?.[latestDate]?.desktop?.status;
-          
-          const mobileMatch = mobileStatus && (statusFilter === 'pass' ? mobileStatus === 'Pass' : mobileStatus !== 'Pass');
-          const desktopMatch = desktopStatus && (statusFilter === 'pass' ? desktopStatus === 'Pass' : desktopStatus !== 'Pass');
-          
-          if (deviceFilter === 'mobile') return mobileMatch;
-          if (deviceFilter === 'desktop') return desktopMatch;
-          return mobileMatch || desktopMatch;
+          return uniqueDates.some(date => {
+            const mobileStatus = dataMap[url]?.[date]?.mobile?.status;
+            const desktopStatus = dataMap[url]?.[date]?.desktop?.status;
+
+            const mobileMatch = mobileStatus && (statusFilter === 'pass' ? mobileStatus === 'Pass' : mobileStatus !== 'Pass');
+            const desktopMatch = desktopStatus && (statusFilter === 'pass' ? desktopStatus === 'Pass' : desktopStatus !== 'Pass');
+
+            if (deviceFilter === 'mobile') return mobileMatch;
+            if (deviceFilter === 'desktop') return desktopMatch;
+            return mobileMatch || desktopMatch;
+          });
         });
       }
       // Source filter
@@ -326,7 +328,7 @@ export default function Dashboard() {
     }
 
     return urls;
-  }, [activeCompany, statusFilter, sourceFilter, deviceFilter, latestDate, dataMap, sortKey, sortDir, getSortValue]);
+  }, [activeCompany, statusFilter, sourceFilter, deviceFilter, latestDate, uniqueDates, dataMap, sortKey, sortDir, getSortValue]);
 
   const fmt = (val: number | null, key: MetricKey): string => {
     if (val === null) return '—';
