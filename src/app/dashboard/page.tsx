@@ -103,28 +103,47 @@ export default function Dashboard() {
     return Array.from(dates).sort().reverse();
   }, [records]);
 
-    // Compute recently failed URLs (passed on any previous day, failing today) for Axis Max Life only
-  const recentFailedUrls = useMemo(() => {
-    if (uniqueDates.length < 1) return [];
-    const latest = uniqueDates[0];
-    // Get URLs belonging to Axis Max Life company
-    const axisCompany = companies.find(c => c.name.toLowerCase().includes('axis max life'));
-    const axisUrls = axisCompany ? axisCompany.urls : [];
+const recentFailedInfo = useMemo(() => {
+  if (uniqueDates.length < 1) return [];
+  // Axis Max Life company URLs
+  const axisCompany = companies.find(c => c.name.toLowerCase().includes('axis max life'));
+  const axisUrls = axisCompany ? axisCompany.urls : [];
 
-    return Object.keys(dataMap).filter(url => {
-      if (!axisUrls.includes(url)) return false;
-      const latestDevices = dataMap[url]?.[latest] ?? {};
-      const latestPass = Object.values(latestDevices).some(r => r?.status === 'Pass');
-      if (latestPass) return false;
-      const earlierDates = uniqueDates.slice(1);
-      const hasPrevPass = earlierDates.some(date => {
-        const dev = dataMap[url]?.[date] ?? {};
-        return Object.values(dev).some(r => r?.status === 'Pass');
-      });
-      return hasPrevPass;
-    });
-  }, [uniqueDates, dataMap, companies]);
-  // Duplicate recentFailedUrls definition removed
+  return Object.keys(dataMap).reduce((acc, url) => {
+    if (!axisUrls.includes(url)) return acc;
+    // Determine failing devices on latest date
+    const latestDate = uniqueDates[0];
+    const latestDevices = dataMap[url]?.[latestDate] ?? {};
+    const failingDevices = Object.entries(latestDevices)
+      .filter(([, r]) => !(r?.status === 'Pass'))
+      .map(([device]) => device as Device);
+    // If any device passes today, skip this URL
+    const anyPassToday = Object.values(latestDevices).some(r => r?.status === 'Pass');
+    if (anyPassToday) return acc;
+
+    // Find transition date: first date (newer) where fail follows a pass
+    let transitionDate = '';
+    for (let i = 0; i < uniqueDates.length - 1; i++) {
+      const date = uniqueDates[i]; // newer date
+      const olderDate = uniqueDates[i + 1]; // older date
+      const dev = dataMap[url]?.[date] ?? {};
+      const olderDev = dataMap[url]?.[olderDate] ?? {};
+      const hasPass = Object.values(dev).some(r => r?.status === 'Pass');
+      const olderHasPass = Object.values(olderDev).some(r => r?.status === 'Pass');
+      // We need a fail on newer date (no pass) and a pass on older date
+      if (!hasPass && olderHasPass) {
+        transitionDate = date;
+        break;
+      }
+    }
+
+
+    if (transitionDate && failingDevices.length > 0) {
+      acc.push({ url, devices: failingDevices, date: transitionDate });
+    }
+    return acc;
+  }, [] as { url: string; devices: Device[]; date: string }[]);
+}, [uniqueDates, dataMap, companies]);
 
   const DEVICES: Device[] = ['mobile', 'desktop'];
 
@@ -189,16 +208,18 @@ export default function Dashboard() {
         </div>
       </header>
       <>
-        {recentFailedUrls.length > 0 && (
-          <div className={styles.recentFailedSection}>
-            <h2 className={styles.sectionTitle}>Recently Failed URLs</h2>
-            <ul className={styles.failedList}>
-              {recentFailedUrls.map(url => (
-                <li key={url} className={styles.failedItem}>{url}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {recentFailedInfo.length > 0 && (
+            <div className={styles.recentFailedSection}>
+              <h2 className={styles.sectionTitle}>Recently Failed URLs</h2>
+              <ul className={styles.failedList}>
+                {recentFailedInfo.map(item => (
+                  <li key={item.url} className={styles.failedItem}>
+                    {item.url} ({item.devices.join(', ')}) – {item.date}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
         {loading ? (
           <div className={styles.loadingContainer}>
