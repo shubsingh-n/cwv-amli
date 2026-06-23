@@ -122,6 +122,23 @@
   font-weight: 600;
 }
 
+.searchInput {
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-main);
+  font-size: 0.8rem;
+  outline: none;
+  transition: var(--transition);
+  width: 200px;
+}
+
+.searchInput:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
 .toolbarHint {
   font-size: 0.75rem;
   color: #64748b;

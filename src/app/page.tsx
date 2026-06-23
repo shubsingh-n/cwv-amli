@@ -106,6 +106,7 @@ export default function Dashboard() {
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; url: string } | null>(null);
   const [fetchingUrls, setFetchingUrls] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
 
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -317,6 +318,11 @@ export default function Dashboard() {
       }
     }
 
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase();
+      urls = urls.filter(url => url.toLowerCase().includes(lowerQuery));
+    }
+
     // Sorting
     if (sortKey) {
       urls.sort((a, b) => {
@@ -328,7 +334,7 @@ export default function Dashboard() {
     }
 
     return urls;
-  }, [activeCompany, statusFilter, sourceFilter, deviceFilter, latestDate, uniqueDates, dataMap, sortKey, sortDir, getSortValue]);
+  }, [activeCompany, statusFilter, sourceFilter, deviceFilter, latestDate, uniqueDates, dataMap, sortKey, sortDir, getSortValue, searchQuery]);
 
   const fmt = (val: number | null, key: MetricKey): string => {
     if (val === null) return '—';
@@ -470,6 +476,15 @@ export default function Dashboard() {
                       <h3>Filters</h3>
                       <button className={styles.closeSheetBtn} onClick={() => setIsMobileFiltersOpen(false)}>×</button>
                     </div>
+
+                    <input
+                      type="text"
+                      className={styles.searchInput}
+                      placeholder="Search URLs..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <span className={styles.toolbarDivider}>|</span>
 
                     <span className={styles.toolbarLabel}>Device:</span>
                     {(['all', 'mobile', 'desktop'] as const).map(d => (
